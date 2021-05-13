@@ -1,0 +1,22 @@
+[package]
+name = "os"
+version = "0.1.0"
+authors = ["krista-chan <qbotdev84@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bootloader = "0.9.17"
+volatile = "0.2.6"
+
+[package.metadata.bootimage]
+# The cargo subcommand that will be used for building the kernel.
+#
+# For building using the `cargo-xbuild` crate, set this to `xbuild`.
+build-command = ["build"]
+# The command invoked with the created bootimage (the "{}" will be replaced
+# with the path to the bootable disk image)
+# Applies to `bootimage run` and `bootimage runner`
+run-command = ["qemu-system-x86_64", "-drive", "format=raw,file={}"]
+

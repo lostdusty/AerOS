@@ -19,3 +19,4 @@ build-command = ["build"]
 # with the path to the bootable disk image)
 # Applies to `bootimage run` and `bootimage runner`
 run-command = ["qemu-system-x86_64", "-drive", "format=raw,file={}"]
+

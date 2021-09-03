@@ -1,5 +1,7 @@
+use core::fmt::{self, Write};
+use lazy_static::lazy_static;
+use spin::Mutex;
 use volatile::Volatile;
-use core::fmt::Write;
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -8,18 +10,20 @@ pub enum Colours {
     BLACK = 0,
     BLUE = 1,
     GREEN = 2,
+    CYAN = 3,
     RED = 4,
+    MAGENTA = 5,
     LIGHT_GRAY = 7,
     DARK_GRAY = 8,
+    LIGHT_CYAN = 11,
     PINK = 13,
     YELLOW = 14,
     WHITE = 15,
 }
 
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(transparent)]
-struct Colour(u8);
+pub struct Colour(u8);
 
 impl Colour {
     pub fn new(fg: Colours, bg: Colours) -> Self {
@@ -82,6 +86,10 @@ impl Writer {
         }
     }
 
+    pub fn set_colour(&mut self, colour: Colour) {
+        self.colour = colour;
+    }
+
     fn new_line(&mut self) {
         for row in 1..BUFFER_HEIGHT {
             for col in 0..BUFFER_WIDTH {
@@ -96,7 +104,7 @@ impl Writer {
     fn clear_row(&mut self, row: usize) {
         let blank_char = ScreenChar {
             ascii_char: b' ',
-            colour: self.colour
+            colour: self.colour,
         };
 
         for col in 0..BUFFER_WIDTH {
@@ -112,26 +120,53 @@ impl Write for Writer {
     }
 }
 
-pub fn print_something() {
-    let mut writer_green = Writer {
+lazy_static! {
+    pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
         col_pos: 0,
-        colour: Colour::new(Colours::GREEN, Colours::BLACK),
+        colour: Colour::new(Colours::WHITE, Colours::BLACK),
         buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
-    };
+    });
+}
 
-    let mut writer_red = Writer {
-        col_pos: 0,
-        colour: Colour::new(Colours::RED, Colours::BLACK),
-        buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
-    };
+#[macro_export]
+macro_rules! print {
+    ($($arg:tt)*) => ($crate::vga_buffer::_print(format_args!($($arg)*)));
+}
 
-    let mut writer_blue = Writer {
-        col_pos: 0,
-        colour: Colour::new(Colours::BLUE, Colours::BLACK),
-        buffer: unsafe { &mut *(0xb8000 as *mut Buffer) },
-    };
+#[macro_export]
+macro_rules! println {
+    () => ($crate::print!("\n"));
+    ($($arg:tt)*) => ($crate::print!("{}\n", format_args!($($arg)*)));
+}
 
-    write!(writer_green, "this is green {}\n", 1+1).unwrap();
-    write!(writer_red, "this is red {}\n", 1+1).unwrap();
-    write!(writer_blue, "this is blue {}\n", 1+1).unwrap();
+#[doc(hidden)]
+pub fn _print(args: fmt::Arguments) {
+    WRITER.lock().write_fmt(args).unwrap();
+}
+
+mod tests {
+    #[allow(unused_imports)]
+    use super::*;
+
+    #[test_case]
+    fn println_print_one() {
+        println!("test_println_simple output");
+    }
+
+    #[test_case]
+    fn println_print_many() {
+        for _ in 0..200 {
+            println!("test_println_many output");
+        }
+    }
+
+    #[test_case]
+    fn test_println_output() {
+        let s = "Some test string that fits on a single line";
+        println!("{}", s);
+        for (i, c) in s.chars().enumerate() {
+            let screen_char = WRITER.lock().buffer.chars[BUFFER_HEIGHT - 2][i].read();
+            assert_eq!(char::from(screen_char.ascii_char), c);
+        }
+    }
 }
